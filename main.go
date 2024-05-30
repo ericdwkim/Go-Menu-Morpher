@@ -76,7 +76,12 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer accountsResponse.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(accountsResponse.Body)
 
 	var accountsData struct {
 		Accounts []struct {

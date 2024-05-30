@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -124,5 +125,8 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Login Completed. Found locations: %v", locationsData.Locations)
+	_, err = fmt.Fprintf(w, "Login Completed. Found locations: %v", locationsData.Locations)
+	if err != nil {
+		return
+	}
 }

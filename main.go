@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 // Declare pointer variable
@@ -38,10 +40,9 @@ func main() {
 }
 
 func handleMain(w http.ResponseWriter, r *http.Request) {
-	var htmlIndex = "<html><body><a href=\"/login\">Google Log In</a></body></html>"
+	var htmlIndex = `<html><body><a href="/login">Google Log In</a></body></html>`
 	_, err := fmt.Fprint(w, htmlIndex)
 	if err != nil {
-		log.Println(err)
 		return
 	}
 }
@@ -71,6 +72,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	client := oauth2Config.Client(context.Background(), token)
 
 	// Fetch accounts
+	// TODO: response returns 404 page
 	accountsResponse, err := client.Get("https://mybusiness.googleapis.com/v4/accounts")
 	if err != nil {
 		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
@@ -83,13 +85,22 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}(accountsResponse.Body)
 
+	// Log the raw response body for debugging
+	body, err := ioutil.ReadAll(accountsResponse.Body)
+	if err != nil {
+		http.Error(w, "Failed to read accounts response: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Accounts response body: %s", body)
+
 	var accountsData struct {
 		Accounts []struct {
 			Name string `json:"name"`
 		} `json:"accounts"`
 	}
 
-	if err := json.NewDecoder(accountsResponse.Body).Decode(&accountsData); err != nil {
+	// Decode the JSON response
+	if err := json.Unmarshal(body, &accountsData); err != nil {
 		http.Error(w, "Failed to decode accounts response: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -110,9 +121,16 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			log.Printf("Failed to close response body: %v", err)
 		}
 	}(locationsResponse.Body)
+
+	body, err = ioutil.ReadAll(locationsResponse.Body)
+	if err != nil {
+		http.Error(w, "Failed to read locations response: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Locations response body: %s", body)
 
 	var locationsData struct {
 		Locations []struct {
@@ -120,7 +138,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		} `json:"locations"`
 	}
 
-	if err := json.NewDecoder(locationsResponse.Body).Decode(&locationsData); err != nil {
+	if err := json.Unmarshal(body, &locationsData); err != nil {
 		http.Error(w, "Failed to decode locations response: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

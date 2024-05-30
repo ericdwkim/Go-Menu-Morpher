@@ -72,8 +72,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	client := oauth2Config.Client(context.Background(), token)
 
 	// Fetch accounts
-	// TODO: response returns 404 page
-	accountsResponse, err := client.Get("https://mybusiness.googleapis.com/v4/accounts")
+	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
 		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
 		return

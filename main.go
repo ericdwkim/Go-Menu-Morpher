@@ -101,7 +101,12 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer locationsResponse.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(locationsResponse.Body)
 
 	var locationsData struct {
 		Locations []struct {

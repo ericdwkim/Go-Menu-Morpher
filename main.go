@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"golang.org/x/oauth2"
@@ -110,9 +111,25 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountID := accountsData.Accounts[0].Name // Use the first account ID
+	log.Printf("Found account: %s", accountID)
+
+	// Build the URL with query parameters
+	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
+
+	reqURL, err := url.Parse(baseURL)
+	if err != nil {
+		http.Error(w, "Failed to parse URL: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Add the `readMask` query parameter
+	query := reqURL.Query()
+	query.Set("readMask", "name")
+	reqURL.RawQuery = query.Encode()
 
 	// Fetch locations for the account
-	locationsResponse, err := client.Get(fmt.Sprintf("https://mybusiness.googleapis.com/v4/%s/locations", accountID))
+	locationsResponse, err := client.Get(reqURL.String())
+
 	if err != nil {
 		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -151,4 +168,8 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+
+	locationId := locationsData.Locations[0].Name // Use the first location ID from body
+	log.Printf("Found location '%s' with accountID '%s'", locationId, accountID)
+
 }

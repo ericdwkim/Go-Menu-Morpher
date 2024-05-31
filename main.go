@@ -51,11 +51,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authCodeURL, http.StatusTemporaryRedirect)
 }
 
-func closeResponse(Body io.ReadCloser) {
-	err := Body.Close()
-	if err != nil {
-		log.Printf("Failed to close response body: %v", err)
-	}
+func readAndCloseResponse(body io.ReadCloser) ([]byte, error) {
+	defer func() {
+		if err := body.Close(); err != nil {
+			log.Printf("Failed to close body: %v", err)
+		}
+	}()
+	return io.ReadAll(body)
 }
 
 func exchangeToken(code string) (*oauth2.Token, error) {
@@ -66,57 +68,18 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-//func fetchAccounts(client *http.Client) (*struct {
-//	Account []struct {
-//		Name string 'json:"name"'
-//	} 'json:"accounts"'
-//}, error) {
-//	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer closeResponse(accountsResponse.Body)
-//
-//
-//}
-
-func handleCallback(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	// Check if code is empty string
-	if code == "" {
-		http.Error(w, "No code in the request", http.StatusBadRequest)
-		return
-	}
-	// Exchange auth code for token
-	token, err := exchangeToken(code)
-
-	// Error handling for token exchange
-	if err != nil {
-		log.Printf("Failed to exchange token: %v", err)
-		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	// Create HTTP client authenticated with obtained token
-	client := oauth2Config.Client(context.Background(), token)
-
-	// Fetch accounts
+func fetchAccounts(client *http.Client) (*struct {
+	Accounts []struct {
+		Name string `json:"name"`
+	} `json:"accounts"`
+}, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
-		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(accountsResponse.Body)
-
-	// Log the raw response body for debugging
-	body, err := io.ReadAll(accountsResponse.Body)
+	body, err := readAndCloseResponse(accountsResponse.Body)
 	if err != nil {
-		http.Error(w, "Failed to read accounts response: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	log.Printf("Accounts response body: %s", body)
 
@@ -125,53 +88,36 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 			Name string `json:"name"`
 		} `json:"accounts"`
 	}
-
-	// Decode the JSON response
 	if err := json.Unmarshal(body, &accountsData); err != nil {
-		http.Error(w, "Failed to decode accounts response: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
-	if len(accountsData.Accounts) == 0 {
-		http.Error(w, "No accounts found", http.StatusInternalServerError)
-		return
-	}
+	return &accountsData, nil
+}
 
-	accountID := accountsData.Accounts[0].Name // Use the first account ID
-	log.Printf("Found account: %s", accountID)
-
-	// Build the URL with query parameters
+func fetchLocations(client *http.Client, accountID string) (*struct {
+	Locations []struct {
+		Name string `json:"name"`
+	} `json:"locations"`
+}, error) {
 	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
 
 	reqURL, err := url.Parse(baseURL)
 	if err != nil {
-		http.Error(w, "Failed to parse URL: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
-	// Add the `readMask` query parameter
 	query := reqURL.Query()
 	query.Set("readMask", "name")
 	reqURL.RawQuery = query.Encode()
 
-	// Fetch locations for the account
 	locationsResponse, err := client.Get(reqURL.String())
-
 	if err != nil {
-		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("Failed to close response body: %v", err)
-		}
-	}(locationsResponse.Body)
-
-	body, err = io.ReadAll(locationsResponse.Body)
+	body, err := readAndCloseResponse(locationsResponse.Body)
 	if err != nil {
-		http.Error(w, "Failed to read locations response: "+err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	log.Printf("Locations response body: %s", body)
 
@@ -180,9 +126,45 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 			Name string `json:"name"`
 		} `json:"locations"`
 	}
-
 	if err := json.Unmarshal(body, &locationsData); err != nil {
-		http.Error(w, "Failed to decode locations response: "+err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+
+	return &locationsData, nil
+}
+func handleCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Error(w, "No code in the request", http.StatusBadRequest)
+		return
+	}
+
+	token, err := exchangeToken(code)
+	if err != nil {
+		log.Printf("Failed to exchange token: %v", err)
+		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	client := oauth2Config.Client(context.Background(), token)
+
+	accountsData, err := fetchAccounts(client)
+	if err != nil {
+		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(accountsData.Accounts) == 0 {
+		http.Error(w, "No accounts found", http.StatusInternalServerError)
+		return
+	}
+
+	accountID := accountsData.Accounts[0].Name
+	log.Printf("Found account: %s", accountID)
+
+	locationsData, err := fetchLocations(client, accountID)
+	if err != nil {
+		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -196,7 +178,6 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	locationId := locationsData.Locations[0].Name // Use the first location ID from body
+	locationId := locationsData.Locations[0].Name
 	log.Printf("Found location '%s' with accountID '%s'", locationId, accountID)
-
 }

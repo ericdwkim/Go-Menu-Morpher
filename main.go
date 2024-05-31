@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 // Declare pointer variable
@@ -48,8 +47,8 @@ func handleMain(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
-	url := oauth2Config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	authCodeURL := oauth2Config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	http.Redirect(w, r, authCodeURL, http.StatusTemporaryRedirect)
 }
 
 func closeResponse(Body io.ReadCloser) {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -86,7 +85,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	}(accountsResponse.Body)
 
 	// Log the raw response body for debugging
-	body, err := ioutil.ReadAll(accountsResponse.Body)
+	body, err := io.ReadAll(accountsResponse.Body)
 	if err != nil {
 		http.Error(w, "Failed to read accounts response: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -141,7 +140,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}(locationsResponse.Body)
 
-	body, err = ioutil.ReadAll(locationsResponse.Body)
+	body, err = io.ReadAll(locationsResponse.Body)
 	if err != nil {
 		http.Error(w, "Failed to read locations response: "+err.Error(), http.StatusInternalServerError)
 		return

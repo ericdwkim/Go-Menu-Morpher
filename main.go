@@ -52,6 +52,35 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
+func closeResponse(Body io.ReadCloser) {
+	err := Body.Close()
+	if err != nil {
+		log.Printf("Failed to close response body: %v", err)
+	}
+}
+
+func exchangeToken(code string) (*oauth2.Token, error) {
+	token, err := oauth2Config.Exchange(context.Background(), code)
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+//func fetchAccounts(client *http.Client) (*struct {
+//	Account []struct {
+//		Name string 'json:"name"'
+//	} 'json:"accounts"'
+//}, error) {
+//	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
+//	if err != nil {
+//		return nil, err
+//	}
+//	defer closeResponse(accountsResponse.Body)
+//
+//
+//}
+
 func handleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	// Check if code is empty string
@@ -60,7 +89,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Exchange auth code for token
-	token, err := oauth2Config.Exchange(context.Background(), code)
+	token, err := exchangeToken(code)
 
 	// Error handling for token exchange
 	if err != nil {

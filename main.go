@@ -114,7 +114,6 @@ func getAccountId(client *http.Client) (string, error) {
 	return accountID, nil
 }
 
-// todo: refactor
 func fetchLocations(client *http.Client, accountID string) (*models.Locations, error) {
 	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
 
@@ -141,16 +140,33 @@ func fetchLocations(client *http.Client, accountID string) (*models.Locations, e
 	if err := json.Unmarshal(body, &locationsData); err != nil {
 		return nil, err
 	}
+	if len(locationsData.Locations) == 0 {
+		return nil, fmt.Errorf("No locations found")
+	}
 
 	return &locationsData, nil
-
 }
 
-// todo: ultimate objective
-//func fetchMenus(client *http.Client) (*models.Menus, error) {
-//
-//	resp, err := client.Get("https://mybusiness.googleapis.com/v4/")
-//}
+func _getLocationId(locationsData *models.Locations) (string, error) {
+	if len(locationsData.Locations) > 0 {
+		var locationId = locationsData.Locations[0].Name
+		log.Printf("Found location: %s", locationId)
+		return locationId, nil
+	}
+	return "", fmt.Errorf("No locations found")
+}
+
+func getLocationId(client *http.Client, accountId string) (string, error) {
+	locationsData, err := fetchLocations(client, accountId)
+	if err != nil {
+		return "", err
+	}
+	locationId, err := _getLocationId(locationsData)
+	if err != nil {
+		return "", err
+	}
+	return locationId, nil
+}
 
 func handleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
@@ -168,25 +184,15 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	client := oauth2Config.Client(context.Background(), token)
 
-	accountID, err := getAccountId(client)
+	accountID, _ := getAccountId(client)
 
-	locationsData, err := fetchLocations(client, accountID)
-	if err != nil {
-		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	locationId, _ := getLocationId(client, accountID)
 
-	if len(locationsData.Locations) == 0 {
-		http.Error(w, "No locations found", http.StatusInternalServerError)
-		return
-	}
+	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountID)
+}
 
-	_, err = fmt.Fprintf(w, "Login Completed. Found locations: %v", locationsData.Locations)
-	if err != nil {
-		return
-	}
+// todo: ultimate objective
+func fetchMenus(client *http.Client) (*models.Menus, error) {
 
-	locationId := locationsData.Locations[0].Name
-	log.Printf("Location ID: '%s' | Account ID '%s'", locationId, accountID)
-	return
+	resp, err := client.Get("https://mybusiness.googleapis.com/v4/")
 }

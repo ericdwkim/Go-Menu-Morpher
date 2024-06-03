@@ -8,6 +8,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"io"
 	"log"
+	"menu-morpher-golang/models"
 	"net/http"
 	"net/url"
 	"os"
@@ -68,11 +69,7 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func fetchAccounts(client *http.Client) (*struct {
-	Accounts []struct {
-		Name string `json:"name"`
-	} `json:"accounts"`
-}, error) {
+func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
 		return nil, err
@@ -83,11 +80,7 @@ func fetchAccounts(client *http.Client) (*struct {
 	}
 	log.Printf("Accounts response body: %s", body)
 
-	var accountsData struct {
-		Accounts []struct {
-			Name string `json:"name"`
-		} `json:"accounts"`
-	}
+	var accountsData models.Accounts
 	if err := json.Unmarshal(body, &accountsData); err != nil {
 		return nil, err
 	}
@@ -95,11 +88,7 @@ func fetchAccounts(client *http.Client) (*struct {
 	return &accountsData, nil
 }
 
-func fetchLocations(client *http.Client, accountID string) (*struct {
-	Locations []struct {
-		Name string `json:"name"`
-	} `json:"locations"`
-}, error) {
+func fetchLocations(client *http.Client, accountID string) (*models.Locations, error) {
 	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
 
 	reqURL, err := url.Parse(baseURL)
@@ -121,11 +110,7 @@ func fetchLocations(client *http.Client, accountID string) (*struct {
 	}
 	log.Printf("Locations response body: %s", body)
 
-	var locationsData struct {
-		Locations []struct {
-			Name string `json:"name"`
-		} `json:"locations"`
-	}
+	var locationsData models.Locations
 	if err := json.Unmarshal(body, &locationsData); err != nil {
 		return nil, err
 	}
@@ -179,5 +164,6 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	locationId := locationsData.Locations[0].Name
-	log.Printf("Found location '%s' with accountID '%s'", locationId, accountID)
+	log.Printf("Location ID: '%s' | Account ID '%s'", locationId, accountID)
+	return
 }

@@ -69,7 +69,6 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-// todo: refactor syntax
 func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
@@ -89,16 +88,32 @@ func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	}
 	if len(accountsData.Accounts) == 0 {
 		http.Error(w, "No accounts found", http.StatusInternalServerError)
+		return nil, fmt.Errorf("No accounts found")
 	}
 
 	return &accountsData, nil
 }
 
-// todo: testing required
-func getAccountId(accountsData models.Accounts) (accountId string) {
-	accountID := accountsData.Accounts[0].Name
-	log.Printf("Found account: %s", accountID)
-	return accountId
+func _getAccountId(accountsData *models.Accounts) (string, error) {
+	if len(accountsData.Accounts) > 0 {
+		var accountId = accountsData.Accounts[0].Name
+		log.Printf("Found account: %s", accountI)
+		return accountId, nil
+	}
+	return "", fmt.Errorf("No accounts found")
+}
+
+func getAccountId(client *http.Client) (string, error) {
+
+	accountsData, err := fetchAccounts(client)
+	if err != nil {
+		return "", err
+	}
+	accountID, err := _getAccountId(accountsData)
+	if err != nil {
+		return "", err
+	}
+	return accountID, nil
 }
 
 // todo: refactor
@@ -155,19 +170,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	client := oauth2Config.Client(context.Background(), token)
 
-	accountsData, err := fetchAccounts(client)
-	//if err != nil {
-	//	http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
-
-	//if len(accountsData.Accounts) == 0 {
-	//	http.Error(w, "No accounts found", http.StatusInternalServerError)
-	//	return
-	//}
-	// todo: clean up
-	accountID := accountsData.Accounts[0].Name
-	log.Printf("Found account: %s", accountID)
+	accountID, err := getAccountId(client)
 
 	locationsData, err := fetchLocations(client, accountID)
 	if err != nil {

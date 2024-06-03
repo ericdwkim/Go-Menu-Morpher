@@ -1,5 +1,24 @@
 package models
 
+// Accounts struct
+type Account struct {
+	Name string `json:"name"`
+}
+
+type Accounts struct {
+	Accounts []Account `json:"accounts"`
+}
+
+// Locations struct
+type Location struct {
+	Name string `json:"name"`
+}
+
+type Locations struct {
+	Locations []Location `json:"locations"`
+}
+
+// Menu structs
 type Price struct {
 	CurrencyCode string `json:"currencyCode"`
 	Units        int    `json:"units"`

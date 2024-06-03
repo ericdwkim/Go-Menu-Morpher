@@ -189,10 +189,15 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	locationId, _ := getLocationId(client, accountID)
 
 	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountID)
-}
 
-// todo: ultimate objective
-func fetchMenus(client *http.Client) (*models.Menus, error) {
+	fetchMenus := func() (*models.Menus, error) {
+		getMenusUrl := fmt.Sprintf("https://mybusinessaccountmanagement.googleapis.com/v1/accounts/%s/locations/%s/foodMenus", accountID, locationId)
+		resp, err := client.Get(getMenusUrl)
+		if err != nil {
+			return nil, err
+		}
+		body, err := readAndCloseResponse(resp.Body)
+		//	TODO: stdout of body as json file
+	}
 
-	resp, err := client.Get("https://mybusiness.googleapis.com/v4/")
 }

@@ -72,7 +72,6 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
-		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
 
@@ -87,7 +86,6 @@ func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 		return nil, err
 	}
 	if len(accountsData.Accounts) == 0 {
-		http.Error(w, "No accounts found", http.StatusInternalServerError)
 		return nil, fmt.Errorf("No accounts found")
 	}
 
@@ -97,7 +95,7 @@ func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 func _getAccountId(accountsData *models.Accounts) (string, error) {
 	if len(accountsData.Accounts) > 0 {
 		var accountId = accountsData.Accounts[0].Name
-		log.Printf("Found account: %s", accountI)
+		log.Printf("Found account: %s", accountId)
 		return accountId, nil
 	}
 	return "", fmt.Errorf("No accounts found")

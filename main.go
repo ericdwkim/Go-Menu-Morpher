@@ -69,11 +69,14 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
+// todo: refactor syntax
 func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
+		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
 		return nil, err
 	}
+
 	body, err := readAndCloseResponse(accountsResponse.Body)
 	if err != nil {
 		return nil, err
@@ -84,10 +87,21 @@ func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	if err := json.Unmarshal(body, &accountsData); err != nil {
 		return nil, err
 	}
+	if len(accountsData.Accounts) == 0 {
+		http.Error(w, "No accounts found", http.StatusInternalServerError)
+	}
 
 	return &accountsData, nil
 }
 
+// todo: testing required
+func getAccountId(accountsData models.Accounts) (accountId string) {
+	accountID := accountsData.Accounts[0].Name
+	log.Printf("Found account: %s", accountID)
+	return accountId
+}
+
+// todo: refactor
 func fetchLocations(client *http.Client, accountID string) (*models.Locations, error) {
 	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
 
@@ -116,7 +130,15 @@ func fetchLocations(client *http.Client, accountID string) (*models.Locations, e
 	}
 
 	return &locationsData, nil
+
 }
+
+// todo: ultimate objective
+//func fetchMenus(client *http.Client) (*models.Menus, error) {
+//
+//	resp, err := client.Get("https://mybusiness.googleapis.com/v4/")
+//}
+
 func handleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -134,16 +156,16 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	client := oauth2Config.Client(context.Background(), token)
 
 	accountsData, err := fetchAccounts(client)
-	if err != nil {
-		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	//if err != nil {
+	//	http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
 
-	if len(accountsData.Accounts) == 0 {
-		http.Error(w, "No accounts found", http.StatusInternalServerError)
-		return
-	}
-
+	//if len(accountsData.Accounts) == 0 {
+	//	http.Error(w, "No accounts found", http.StatusInternalServerError)
+	//	return
+	//}
+	// todo: clean up
 	accountID := accountsData.Accounts[0].Name
 	log.Printf("Found account: %s", accountID)
 

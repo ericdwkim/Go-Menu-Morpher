@@ -21,7 +21,7 @@ type Locations struct {
 // Menu structs
 type Price struct {
 	CurrencyCode string `json:"currencyCode"`
-	Units        int    `json:"units"`
+	Units        string `json:"units"`
 	Nanos        int    `json:"nanos"`
 }
 

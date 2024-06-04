@@ -190,14 +190,38 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountID)
 
-	fetchMenus := func() (*models.Menus, error) {
-		getMenusUrl := fmt.Sprintf("https://mybusinessaccountmanagement.googleapis.com/v1/accounts/%s/locations/%s/foodMenus", accountID, locationId)
-		resp, err := client.Get(getMenusUrl)
-		if err != nil {
-			return nil, err
-		}
-		body, err := readAndCloseResponse(resp.Body)
-		//	TODO: stdout of body as json file
+}
+
+func getMenus(client *http.Client, accountId string, locationId string) (*models.Menus, error) {
+	getFoodMenusUrl := fmt.Sprintf("https://mybusinessinformation.googleapis.com/v1/%s/locations/%s/foodMenus", accountId, locationId)
+	resp, err := client.Get(getFoodMenusUrl)
+	if err != nil {
+		return nil, err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get food menus: %s", resp.Status)
+	}
+
+	body, err := readAndCloseResponse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save response body of menus as stdout
+	err = os.WriteFile("foodMenus.json", body, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	var menusData models.Menus
+	if err := json.Unmarshal(body, &menusData); err != nil {
+		return nil, err
+	}
+
+	if len(menusData.Menus) == 0 {
+		return nil, fmt.Errorf("No food menus found")
+
+	}
+	return &menusData, nil
 }

@@ -107,15 +107,15 @@ func getAccountId(client *http.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	accountID, err := _getAccountId(accountsData)
+	accountId, err := _getAccountId(accountsData)
 	if err != nil {
 		return "", err
 	}
-	return accountID, nil
+	return accountId, nil
 }
 
-func fetchLocations(client *http.Client, accountID string) (*models.Locations, error) {
-	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
+func fetchLocations(client *http.Client, accountId string) (*models.Locations, error) {
+	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountId)
 
 	reqURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -168,30 +168,6 @@ func getLocationId(client *http.Client, accountId string) (string, error) {
 	return locationId, nil
 }
 
-func handleCallback(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		http.Error(w, "No code in the request", http.StatusBadRequest)
-		return
-	}
-
-	token, err := exchangeToken(code)
-	if err != nil {
-		log.Printf("Failed to exchange token: %v", err)
-		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	client := oauth2Config.Client(context.Background(), token)
-
-	accountID, _ := getAccountId(client)
-
-	locationId, _ := getLocationId(client, accountID)
-
-	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountID)
-
-}
-
 func getMenus(client *http.Client, accountId string, locationId string) (*models.Menus, error) {
 	getFoodMenusUrl := fmt.Sprintf("https://mybusinessinformation.googleapis.com/v1/%s/locations/%s/foodMenus", accountId, locationId)
 	resp, err := client.Get(getFoodMenusUrl)
@@ -209,7 +185,7 @@ func getMenus(client *http.Client, accountId string, locationId string) (*models
 	}
 
 	// Save response body of menus as stdout
-	err = os.WriteFile("foodMenus.json", body, 0644)
+	err = os.WriteFile("menu.json", body, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -224,4 +200,38 @@ func getMenus(client *http.Client, accountId string, locationId string) (*models
 
 	}
 	return &menusData, nil
+}
+
+func handleCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Error(w, "No code in the request", http.StatusBadRequest)
+		return
+	}
+
+	token, err := exchangeToken(code)
+	if err != nil {
+		log.Printf("Failed to exchange token: %v", err)
+		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	client := oauth2Config.Client(context.Background(), token)
+
+	accountId, _ := getAccountId(client)
+
+	locationId, _ := getLocationId(client, accountId)
+
+	menus, err := getMenus(client, accountId, locationId)
+	if err != nil {
+		log.Printf("Failed to get menus: %v", err)
+		http.Error(w, "Failed to get menus: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountId)
+	if err != nil {
+		log.Printf("Failed to write response: %v", err)
+	}
+
 }

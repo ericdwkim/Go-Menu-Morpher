@@ -169,7 +169,8 @@ func getLocationId(client *http.Client, accountId string) (string, error) {
 }
 
 func getMenus(client *http.Client, accountId string, locationId string) (*models.Menus, error) {
-	getFoodMenusUrl := fmt.Sprintf("https://mybusinessinformation.googleapis.com/v1/%s/locations/%s/foodMenus", accountId, locationId)
+	getFoodMenusUrl := fmt.Sprintf("https://mybusiness.googleapis.com/v4/%s/%s/foodMenus", accountId, locationId)
+	log.Printf("getFoodMenusUrl: %s", getFoodMenusUrl)
 	resp, err := client.Get(getFoodMenusUrl)
 	if err != nil {
 		return nil, err
@@ -222,7 +223,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	locationId, _ := getLocationId(client, accountId)
 
-	menus, err := getMenus(client, accountId, locationId)
+	_, err = getMenus(client, accountId, locationId)
 	if err != nil {
 		log.Printf("Failed to get menus: %v", err)
 		http.Error(w, "Failed to get menus: "+err.Error(), http.StatusInternalServerError)

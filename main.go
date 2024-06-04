@@ -8,6 +8,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"io"
 	"log"
+	"menu-morpher-golang/models"
 	"net/http"
 	"net/url"
 	"os"
@@ -68,39 +69,53 @@ func exchangeToken(code string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func fetchAccounts(client *http.Client) (*struct {
-	Accounts []struct {
-		Name string `json:"name"`
-	} `json:"accounts"`
-}, error) {
+func fetchAccounts(client *http.Client) (*models.Accounts, error) {
 	accountsResponse, err := client.Get("https://mybusinessaccountmanagement.googleapis.com/v1/accounts")
 	if err != nil {
 		return nil, err
 	}
+
 	body, err := readAndCloseResponse(accountsResponse.Body)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("Accounts response body: %s", body)
 
-	var accountsData struct {
-		Accounts []struct {
-			Name string `json:"name"`
-		} `json:"accounts"`
-	}
+	var accountsData models.Accounts
 	if err := json.Unmarshal(body, &accountsData); err != nil {
 		return nil, err
+	}
+	if len(accountsData.Accounts) == 0 {
+		return nil, fmt.Errorf("No accounts found")
 	}
 
 	return &accountsData, nil
 }
 
-func fetchLocations(client *http.Client, accountID string) (*struct {
-	Locations []struct {
-		Name string `json:"name"`
-	} `json:"locations"`
-}, error) {
-	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountID)
+func _getAccountId(accountsData *models.Accounts) (string, error) {
+	if len(accountsData.Accounts) > 0 {
+		var accountId = accountsData.Accounts[0].Name
+		log.Printf("Found account: %s", accountId)
+		return accountId, nil
+	}
+	return "", fmt.Errorf("No accounts found")
+}
+
+func getAccountId(client *http.Client) (string, error) {
+
+	accountsData, err := fetchAccounts(client)
+	if err != nil {
+		return "", err
+	}
+	accountId, err := _getAccountId(accountsData)
+	if err != nil {
+		return "", err
+	}
+	return accountId, nil
+}
+
+func fetchLocations(client *http.Client, accountId string) (*models.Locations, error) {
+	baseURL := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountId)
 
 	reqURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -121,17 +136,73 @@ func fetchLocations(client *http.Client, accountID string) (*struct {
 	}
 	log.Printf("Locations response body: %s", body)
 
-	var locationsData struct {
-		Locations []struct {
-			Name string `json:"name"`
-		} `json:"locations"`
-	}
+	var locationsData models.Locations
 	if err := json.Unmarshal(body, &locationsData); err != nil {
 		return nil, err
+	}
+	if len(locationsData.Locations) == 0 {
+		return nil, fmt.Errorf("No locations found")
 	}
 
 	return &locationsData, nil
 }
+
+func _getLocationId(locationsData *models.Locations) (string, error) {
+	if len(locationsData.Locations) > 0 {
+		var locationId = locationsData.Locations[0].Name
+		log.Printf("Found location: %s", locationId)
+		return locationId, nil
+	}
+	return "", fmt.Errorf("No locations found")
+}
+
+func getLocationId(client *http.Client, accountId string) (string, error) {
+	locationsData, err := fetchLocations(client, accountId)
+	if err != nil {
+		return "", err
+	}
+	locationId, err := _getLocationId(locationsData)
+	if err != nil {
+		return "", err
+	}
+	return locationId, nil
+}
+
+func getMenus(client *http.Client, accountId string, locationId string) (*models.Menus, error) {
+	getFoodMenusUrl := fmt.Sprintf("https://mybusiness.googleapis.com/v4/%s/%s/foodMenus", accountId, locationId)
+	log.Printf("getFoodMenusUrl: %s", getFoodMenusUrl)
+	resp, err := client.Get(getFoodMenusUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get food menus: %s", resp.Status)
+	}
+
+	body, err := readAndCloseResponse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save response body of menus as stdout
+	err = os.WriteFile("menu.json", body, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	var menusData models.Menus
+	if err := json.Unmarshal(body, &menusData); err != nil {
+		return nil, err
+	}
+
+	if len(menusData.Menus) == 0 {
+		return nil, fmt.Errorf("No food menus found")
+
+	}
+	return &menusData, nil
+}
+
 func handleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -148,36 +219,20 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	client := oauth2Config.Client(context.Background(), token)
 
-	accountsData, err := fetchAccounts(client)
+	accountId, _ := getAccountId(client)
+
+	locationId, _ := getLocationId(client, accountId)
+
+	_, err = getMenus(client, accountId, locationId)
 	if err != nil {
-		http.Error(w, "Failed to get accounts: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Failed to get menus: %v", err)
+		http.Error(w, "Failed to get menus: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if len(accountsData.Accounts) == 0 {
-		http.Error(w, "No accounts found", http.StatusInternalServerError)
-		return
-	}
-
-	accountID := accountsData.Accounts[0].Name
-	log.Printf("Found account: %s", accountID)
-
-	locationsData, err := fetchLocations(client, accountID)
+	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountId)
 	if err != nil {
-		http.Error(w, "Failed to get locations: "+err.Error(), http.StatusInternalServerError)
-		return
+		log.Printf("Failed to write response: %v", err)
 	}
 
-	if len(locationsData.Locations) == 0 {
-		http.Error(w, "No locations found", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = fmt.Fprintf(w, "Login Completed. Found locations: %v", locationsData.Locations)
-	if err != nil {
-		return
-	}
-
-	locationId := locationsData.Locations[0].Name
-	log.Printf("Found location '%s' with accountID '%s'", locationId, accountID)
 }

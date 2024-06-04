@@ -42,3 +42,10 @@ Start by cloning the repository to your local machine:
 git clone https://github.com/ericdwkim/Go-Menu-Morpher.git
 cd Go-Menu-Morpher
 ```
+
+### Set Environmental Variables
+
+```dotenv
+CLIENT_SECRET=YOUR_GOOGLE_MY_BUSINESS_CLIENT_SECRET_HERE
+CLIENT_ID=YOUR_GOOGLE_MY_BUSINESS_CLIENT_ID_HERE
+```

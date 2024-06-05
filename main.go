@@ -203,6 +203,39 @@ func getMenus(client *http.Client, accountId string, locationId string) (*models
 	return &menusData, nil
 }
 
+func get_canHaveFoodMenus(client *http.Client, locationId string) (bool, error) {
+	get_canHaveFoodMenusUrl := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s", locationId)
+	log.Printf("get_canHaveFoodMenusUrl: %s", get_canHaveFoodMenusUrl)
+	// todo: prints url but hangs at get call; unable to print resp.body
+	// todo: need to access flag field in nested Struct and assign its value to `canHaveFoodMenuFlag` on line 227 and return
+	resp, err := client.Get(get_canHaveFoodMenusUrl)
+	if err != nil {
+		log.Printf("Failed to get can_have_food_menus: %s", err)
+		return false, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("failed to get canHaveFoodMenus: %s", resp.Status)
+	}
+
+	body, err := readAndCloseResponse(resp.Body)
+	if err != nil {
+		log.Printf("failed to read canHaveFoodMenus response: %s", err)
+		return false, err
+	}
+	log.Printf("canHaveFoodMenus response: %s", body)
+
+	var canHaveFoodMenuFlag bool
+	if err := json.Unmarshal(body, &canHaveFoodMenuFlag); err != nil {
+		return false, err
+	}
+	return true, nil
+
+}
+
+//func updateMenus(client *http.Client, accountId string, locationId string) error {
+//
+//}
+
 func handleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -229,6 +262,8 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get menus: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	_, err = get_canHaveFoodMenus(client, locationId)
 
 	_, err = fmt.Fprintf(w, "Login Completed!\nLocation ID: '%s'\nAccount ID '%s'\n", locationId, accountId)
 	if err != nil {
